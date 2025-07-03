@@ -35,6 +35,53 @@ export const calculateKPIs = (data: MentorshipData[]) => {
   };
 };
 
+export const calculateKPIGrowth = (data: MentorshipData[]) => {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  
+  // Parse dates and filter data
+  const parseDate = (dateStr: string) => {
+    const [datePart, timePart] = dateStr.split(' ');
+    const [day, month, year] = datePart.split('/');
+    return new Date(`${year}-${month}-${day}T${timePart}`);
+  };
+  
+  const recentData = data.filter(d => {
+    try {
+      const date = parseDate(d['Carimbo de data/hora']);
+      return date >= sevenDaysAgo;
+    } catch {
+      return false;
+    }
+  });
+  
+  const olderData = data.filter(d => {
+    try {
+      const date = parseDate(d['Carimbo de data/hora']);
+      return date < sevenDaysAgo;
+    } catch {
+      return true; // Include data with unparseable dates in older data
+    }
+  });
+  
+  const recentKPIs = calculateKPIs(recentData);
+  const olderKPIs = calculateKPIs(olderData);
+  
+  const calculateGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
+  };
+  
+  return {
+    totalParticipants: calculateGrowth(recentKPIs.totalParticipants, olderKPIs.totalParticipants),
+    completedMeetings: calculateGrowth(recentKPIs.completedMeetings, olderKPIs.completedMeetings),
+    averageRating: calculateGrowth(recentKPIs.averageRating, olderKPIs.averageRating),
+    averageDuration: calculateGrowth(recentKPIs.averageDuration, olderKPIs.averageDuration),
+    averageEngagement: calculateGrowth(recentKPIs.averageEngagement, olderKPIs.averageEngagement),
+    validatedParticipants: calculateGrowth(recentKPIs.validatedParticipants, olderKPIs.validatedParticipants)
+  };
+};
+
 export const generateChartData = (data: MentorshipData[]) => {
   // Rating distribution
   const ratingDistribution = [
@@ -100,9 +147,21 @@ export const generateChartData = (data: MentorshipData[]) => {
   };
 };
 
-export const analyzeFeedback = (data: MentorshipData[]) => {
-  return data
+export const analyzeFeedback = (data: MentorshipData[], limit?: number) => {
+  // Parse dates and sort by most recent first
+  const parseDate = (dateStr: string) => {
+    try {
+      const [datePart, timePart] = dateStr.split(' ');
+      const [day, month, year] = datePart.split('/');
+      return new Date(`${year}-${month}-${day}T${timePart}`);
+    } catch {
+      return new Date(0); // Fallback for invalid dates
+    }
+  };
+
+  const feedbackData = data
     .filter(d => d['Feedback AI'] && d['Feedback AI'] !== '.' && d['Feedback AI'].trim() !== '')
+    .sort((a, b) => parseDate(b['Carimbo de data/hora']).getTime() - parseDate(a['Carimbo de data/hora']).getTime())
     .map(d => {
       const feedback = d['Feedback AI'];
       let sentiment: 'positive' | 'neutral' | 'negative' = 'neutral';
@@ -126,9 +185,12 @@ export const analyzeFeedback = (data: MentorshipData[]) => {
         sentiment,
         experience: d['1.5 Como foi a sua experiência no último encontro?'],
         rating: d['1.4 De 0 a 10 qual a nota que você dá para o encontro?'],
-        engagement: d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']
+        engagement: d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?'],
+        email: d['Endereço de e-mail']
       };
     });
+
+  return limit ? feedbackData.slice(0, limit) : feedbackData;
 };
 
 export const generateAIInsights = (data: MentorshipData[]) => {
@@ -224,4 +286,21 @@ export const generateAIInsights = (data: MentorshipData[]) => {
   }
   
   return insights;
+};
+
+export const generateIndividualFeedback = (participant: any): string => {
+  // This would typically call an AI service, but for demo purposes, we'll generate based on data
+  const rating = participant.rating || 0;
+  const engagement = participant.engagement || 0;
+  const experience = participant.experience || '';
+  
+  if (rating >= 9 && engagement >= 9) {
+    return `Excelente performance! ${participant.participant} demonstra alta satisfação (${rating}/10) e engajamento excepcional (${engagement}/10). Continue incentivando essa dinâmica positiva.`;
+  } else if (rating >= 7 && engagement >= 7) {
+    return `Boa evolução observada. ${participant.participant} apresenta satisfação satisfatória (${rating}/10) e bom engajamento (${engagement}/10). Há oportunidades para aprimoramento contínuo.`;
+  } else if (rating < 6 || engagement < 6) {
+    return `Atenção necessária. ${participant.participant} apresenta indicadores baixos (Nota: ${rating}/10, Engajamento: ${engagement}/10). Recomenda-se acompanhamento mais próximo e identificação de barreiras.`;
+  } else {
+    return `Performance neutra. ${participant.participant} está dentro da média esperada. Considere estratégias para aumentar o engajamento e satisfação.`;
+  }
 };

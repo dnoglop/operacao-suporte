@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, AlertCircle, CheckCircle, Clock, Star, Users } from 'lucide-react';
+import { Brain, AlertCircle, CheckCircle, Clock, Star, Users, Sparkles } from 'lucide-react';
+import { generateIndividualFeedback } from '../utils/analytics';
 
 interface FeedbackCardProps {
   feedback: string;
@@ -10,6 +11,7 @@ interface FeedbackCardProps {
   experience?: string;
   rating?: number;
   engagement?: number;
+  email: string;
   index: number;
 }
 
@@ -21,8 +23,12 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   experience,
   rating,
   engagement,
+  email,
   index 
 }) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedFeedback, setGeneratedFeedback] = useState<string | null>(null);
+
   const sentimentConfig = {
     positive: { 
       color: 'bg-green-100 text-green-800', 
@@ -47,6 +53,24 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
   const config = sentimentConfig[sentiment];
   const IconComponent = config.icon;
 
+  const handleGenerateFeedback = async () => {
+    setIsGenerating(true);
+    
+    // Simulate AI processing time
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const aiResponse = generateIndividualFeedback({
+      participant,
+      rating,
+      engagement,
+      experience,
+      email
+    });
+    
+    setGeneratedFeedback(aiResponse);
+    setIsGenerating(false);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
@@ -70,11 +94,13 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
             </div>
           </div>
           
-          <div className="space-y-2">
-            <div className="bg-blue-50 rounded-lg p-3">
-              <p className="text-sm text-blue-900 font-medium mb-1">Análise IA:</p>
-              <p className="text-sm text-blue-800">{feedback}</p>
-            </div>
+          <div className="space-y-3">
+            {feedback && feedback !== '.' && (
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-sm text-blue-900 font-medium mb-1">Feedback existente:</p>
+                <p className="text-sm text-blue-800">{feedback}</p>
+              </div>
+            )}
             
             {experience && experience.trim() !== '' && experience !== 'Ainda não realizado' && (
               <div className="bg-gray-50 rounded-lg p-3">
@@ -82,6 +108,45 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = ({
                 <p className="text-sm text-gray-600">{experience}</p>
               </div>
             )}
+
+            {/* AI Feedback Generation Section */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-purple-900 font-medium">Análise IA Personalizada:</p>
+                {!generatedFeedback && !isGenerating && (
+                  <button
+                    onClick={handleGenerateFeedback}
+                    className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span>Gerar</span>
+                  </button>
+                )}
+              </div>
+              
+              {isGenerating && (
+                <div className="flex items-center space-x-2 text-purple-600">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="h-4 w-4 border-2 border-purple-200 border-t-purple-600 rounded-full"
+                  />
+                  <span className="text-sm">Gerando análise...</span>
+                </div>
+              )}
+              
+              {generatedFeedback && (
+                <div className="bg-white/70 rounded-lg p-3">
+                  <p className="text-sm text-purple-800">{generatedFeedback}</p>
+                </div>
+              )}
+              
+              {!generatedFeedback && !isGenerating && (
+                <p className="text-sm text-purple-600 italic">
+                  Clique em "Gerar" para uma análise personalizada
+                </p>
+              )}
+            </div>
             
             <div className="flex items-center space-x-4 text-xs text-gray-500">
               {rating !== undefined && rating > 0 && (

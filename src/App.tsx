@@ -4,20 +4,24 @@ import { Header } from './components/Header';
 import { KPICard } from './components/KPICard';
 import { ChartCard } from './components/ChartCard';
 import { FeedbackCard } from './components/FeedbackCard';
+import { FeedbackModal } from './components/FeedbackModal';
 import { ParticipantTable } from './components/ParticipantTable';
 import { FileUpload } from './components/FileUpload';
 import { AIInsights } from './components/AIInsights';
 import { mockMentorshipData } from './data/mockData';
-import { calculateKPIs, generateChartData, analyzeFeedback, generateAIInsights } from './utils/analytics';
+import { calculateKPIs, calculateKPIGrowth, generateChartData, analyzeFeedback, generateAIInsights } from './utils/analytics';
 import { MentorshipData } from './types';
 
 function App() {
   const [data, setData] = useState<MentorshipData[]>(mockMentorshipData);
   const [showUpload, setShowUpload] = useState(false);
+  const [showAllFeedback, setShowAllFeedback] = useState(false);
 
   const kpis = calculateKPIs(data);
+  const kpiGrowth = calculateKPIGrowth(data);
   const chartData = generateChartData(data);
-  const feedbackData = analyzeFeedback(data);
+  const recentFeedbackData = analyzeFeedback(data, 10); // Last 10 comments
+  const allFeedbackData = analyzeFeedback(data); // All comments
   const aiInsights = generateAIInsights(data);
 
   const handleDataUpload = (newData: MentorshipData[]) => {
@@ -28,42 +32,42 @@ function App() {
     {
       title: 'Total de Participantes',
       value: kpis.totalParticipants,
-      change: 12,
+      change: kpiGrowth.totalParticipants,
       icon: 'users',
       color: 'bg-blue-500'
     },
     {
       title: 'Encontros Realizados',
       value: kpis.completedMeetings,
-      change: 8,
+      change: kpiGrowth.completedMeetings,
       icon: 'calendar',
       color: 'bg-green-500'
     },
     {
       title: 'Nota Média',
       value: `${kpis.averageRating}/10`,
-      change: 5,
+      change: kpiGrowth.averageRating,
       icon: 'star',
       color: 'bg-yellow-500'
     },
     {
       title: 'Duração Média',
       value: `${kpis.averageDuration}min`,
-      change: -2,
+      change: kpiGrowth.averageDuration,
       icon: 'clock',
       color: 'bg-purple-500'
     },
     {
       title: 'Engajamento Médio',
       value: `${kpis.averageEngagement}/10`,
-      change: 15,
+      change: kpiGrowth.averageEngagement,
       icon: 'award',
       color: 'bg-indigo-500'
     },
     {
       title: 'Validados',
       value: kpis.validatedParticipants,
-      change: 25,
+      change: kpiGrowth.validatedParticipants,
       icon: 'message',
       color: 'bg-pink-500'
     }
@@ -118,24 +122,39 @@ function App() {
           <AIInsights insights={aiInsights} />
         </div>
 
-        {/* AI Feedback Section */}
+        {/* Recent Feedback Section */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.3 }}
           className="mb-8"
         >
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Feedback Individual IA</h2>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Feedback Individual IA</h2>
+              <p className="text-sm text-gray-600">Últimos 10 comentários publicados</p>
+            </div>
+            {allFeedbackData.length > 10 && (
+              <button
+                onClick={() => setShowAllFeedback(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Ver todos ({allFeedbackData.length})
+              </button>
+            )}
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {feedbackData.map((feedback, index) => (
+            {recentFeedbackData.map((feedback, index) => (
               <FeedbackCard 
-                key={index} 
+                key={`${feedback.email}-${index}`}
                 {...feedback} 
                 index={index} 
               />
             ))}
           </div>
-          {feedbackData.length === 0 && (
+          
+          {recentFeedbackData.length === 0 && (
             <div className="text-center py-8 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/50">
               <p className="text-gray-600">Nenhum feedback da IA disponível nos dados carregados.</p>
             </div>
@@ -151,6 +170,13 @@ function App() {
           <FileUpload
             onDataUpload={handleDataUpload}
             onClose={() => setShowUpload(false)}
+          />
+        )}
+        
+        {showAllFeedback && (
+          <FeedbackModal
+            feedbackData={allFeedbackData}
+            onClose={() => setShowAllFeedback(false)}
           />
         )}
       </AnimatePresence>
