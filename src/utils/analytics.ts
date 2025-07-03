@@ -41,9 +41,13 @@ export const calculateKPIGrowth = (data: MentorshipData[]) => {
   
   // Parse dates and filter data
   const parseDate = (dateStr: string) => {
-    const [datePart, timePart] = dateStr.split(' ');
-    const [day, month, year] = datePart.split('/');
-    return new Date(`${year}-${month}-${day}T${timePart}`);
+    try {
+      const [datePart, timePart] = dateStr.split(' ');
+      const [day, month, year] = datePart.split('/');
+      return new Date(`${year}-${month}-${day}T${timePart}`);
+    } catch {
+      return new Date(0);
+    }
   };
   
   const recentData = data.filter(d => {
@@ -60,7 +64,7 @@ export const calculateKPIGrowth = (data: MentorshipData[]) => {
       const date = parseDate(d['Carimbo de data/hora']);
       return date < sevenDaysAgo;
     } catch {
-      return true; // Include data with unparseable dates in older data
+      return true;
     }
   });
   
@@ -159,23 +163,42 @@ export const analyzeFeedback = (data: MentorshipData[], limit?: number) => {
     }
   };
 
+  // Filter participants who have experience to share (not just AI feedback)
   const feedbackData = data
-    .filter(d => d['Feedback AI'] && d['Feedback AI'] !== '.' && d['Feedback AI'].trim() !== '')
+    .filter(d => {
+      const hasExperience = d['1.5 Como foi a sua experiência no último encontro?'] && 
+                           d['1.5 Como foi a sua experiência no último encontro?'].trim() !== '' && 
+                           d['1.5 Como foi a sua experiência no último encontro?'] !== 'Ainda não realizado';
+      const hasComments = d['1.7 Você tem alguma dúvida, comentário ou sugestão?'] && 
+                         d['1.7 Você tem alguma dúvida, comentário ou sugestão?'].trim() !== '';
+      return hasExperience || hasComments;
+    })
     .sort((a, b) => parseDate(b['Carimbo de data/hora']).getTime() - parseDate(a['Carimbo de data/hora']).getTime())
     .map(d => {
-      const feedback = d['Feedback AI'];
+      const feedback = d['Feedback AI'] || '';
       let sentiment: 'positive' | 'neutral' | 'negative' = 'neutral';
       
-      // Enhanced sentiment analysis
-      const positiveKeywords = ['positivo', 'excelente', 'ótimo', 'bom', 'satisfação', 'sucesso', 'bem', 'alta', 'promissor', 'bacana', 'feliz'];
-      const negativeKeywords = ['negativo', 'problema', 'ruim', 'baixo', 'dificuldade', 'preocupação', 'insatisfação', 'falha'];
+      // Enhanced sentiment analysis based on rating and experience
+      const rating = d['1.4 De 0 a 10 qual a nota que você dá para o encontro?'];
+      const engagement = d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?'];
+      const experience = d['1.5 Como foi a sua experiência no último encontro?'] || '';
       
-      const lowerFeedback = feedback.toLowerCase();
-      
-      if (positiveKeywords.some(keyword => lowerFeedback.includes(keyword))) {
+      // Determine sentiment based on multiple factors
+      if (rating >= 8 && engagement >= 8) {
         sentiment = 'positive';
-      } else if (negativeKeywords.some(keyword => lowerFeedback.includes(keyword))) {
+      } else if (rating <= 5 || engagement <= 5) {
         sentiment = 'negative';
+      } else {
+        // Check experience text for sentiment keywords
+        const lowerExperience = experience.toLowerCase();
+        const positiveKeywords = ['excelente', 'ótimo', 'bom', 'bacana', 'incrível', 'útil', 'esclarecedor', 'produtivo', 'animada'];
+        const negativeKeywords = ['ruim', 'problema', 'dificuldade', 'esperava mais', 'poderia', 'falta'];
+        
+        if (positiveKeywords.some(keyword => lowerExperience.includes(keyword))) {
+          sentiment = 'positive';
+        } else if (negativeKeywords.some(keyword => lowerExperience.includes(keyword))) {
+          sentiment = 'negative';
+        }
       }
       
       return {
