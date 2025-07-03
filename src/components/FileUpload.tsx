@@ -14,7 +14,47 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onDataUpload, onClose })
   const [errorMessage, setErrorMessage] = useState('');
   const [fileName, setFileName] = useState('');
 
-  const validateJsonData = (data: any[]): boolean => {
+  const keyMap: { [key: string]: keyof MentorshipData } = {
+  'carimbo de data/hora': 'Carimbo de data/hora',
+  'timestamp': 'Carimbo de data/hora',
+  'endereço de e-mail': 'Endereço de e-mail',
+  'email': 'Endereço de e-mail',
+  'e-mail': 'Endereço de e-mail',
+  'nome completo': 'Nome completo',
+  'full name': 'Nome completo',
+  'name': 'Nome completo',
+  'telefone com ddd': 'Telefone com DDD',
+  'phone': 'Telefone com DDD',
+  'você é?': 'Você é?',
+  'role': 'Você é?',
+  'papel': 'Você é?',
+  'qual o programa que está participando?': 'Qual o programa que está participando?',
+  'programa': 'Qual o programa que está participando?',
+  'program': 'Qual o programa que está participando?',
+  'quantos encontros já foram realizados?': 'Quantos encontros já foram realizados?',
+  '1.2 qual encontro foi realizado?': '1.2 Qual encontro foi realizado?',
+  '1.3 quantos minutos durou o encontro?': '1.3 Quantos minutos durou o encontro?',
+  '1.4 de 0 a 10 qual a nota que você dá para o encontro?': '1.4 De 0 a 10 qual a nota que você dá para o encontro?',
+  '1.5 como foi a sua experiência no último encontro?': '1.5 Como foi a sua experiência no último encontro?',
+  '1.6 de 0 a 10 qual a nota que você dá para o engajamento da sua dupla?': '1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?',
+  '1.7 você tem alguma dúvida, comentário ou sugestão?': '1.7 Você tem alguma dúvida, comentário ou sugestão?',
+  'comentários joule': 'Comentários Joule',
+  'feedback ai': 'Feedback AI',
+  'validação': 'Validação',
+  'validation': 'Validação',
+};
+
+const normalizeObjectKeys = (obj: Record<string, any>): Partial<MentorshipData> => {
+  const newObj: Record<string, any> = {};
+  for (const key in obj) {
+    const normalizedKey = key.toLowerCase().trim();
+    const newKey = keyMap[normalizedKey] || key; 
+    newObj[newKey] = obj[key];
+  }
+  return newObj as Partial<MentorshipData>;
+};
+
+const validateJsonData = (data: any[]): boolean => {
     if (!Array.isArray(data)) return false;
     
     const requiredFields = [
@@ -42,7 +82,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onDataUpload, onClose })
 
     try {
       const text = await file.text();
-      const jsonData = JSON.parse(text);
+      let jsonData = JSON.parse(text);
+
+      if (Array.isArray(jsonData)) {
+        jsonData = jsonData.map(normalizeObjectKeys);
+      }
       
       if (!validateJsonData(jsonData)) {
         throw new Error('Formato de dados inválido. Verifique se o arquivo contém os campos obrigatórios.');
