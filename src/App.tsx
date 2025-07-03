@@ -6,8 +6,9 @@ import { ChartCard } from './components/ChartCard';
 import { FeedbackCard } from './components/FeedbackCard';
 import { ParticipantTable } from './components/ParticipantTable';
 import { FileUpload } from './components/FileUpload';
+import { AIInsights } from './components/AIInsights';
 import { mockMentorshipData } from './data/mockData';
-import { calculateKPIs, generateChartData, analyzeFeedback } from './utils/analytics';
+import { calculateKPIs, generateChartData, analyzeFeedback, generateAIInsights } from './utils/analytics';
 import { MentorshipData } from './types';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
   const kpis = calculateKPIs(data);
   const chartData = generateChartData(data);
   const feedbackData = analyzeFeedback(data);
+  const aiInsights = generateAIInsights(data);
 
   const handleDataUpload = (newData: MentorshipData[]) => {
     setData(newData);
@@ -92,7 +94,7 @@ function App() {
             title="Distribuição por Programa"
             data={chartData.programDistribution}
             type="pie"
-            colors={['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']}
+            colors={['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4']}
             index={1}
           />
           <ChartCard
@@ -103,12 +105,17 @@ function App() {
             index={2}
           />
           <ChartCard
-            title="Frequência de Encontros"
+            title="Frequência de Encontros (1-8)"
             data={chartData.meetingFrequency}
             type="bar"
             colors={['#F59E0B']}
             index={3}
           />
+        </div>
+
+        {/* AI Insights Section */}
+        <div className="mb-8">
+          <AIInsights insights={aiInsights} />
         </div>
 
         {/* AI Feedback Section */}
@@ -118,12 +125,21 @@ function App() {
           transition={{ duration: 0.5, delay: 0.3 }}
           className="mb-8"
         >
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Feedback IA</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Feedback Individual IA</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {feedbackData.map((feedback, index) => (
-              <FeedbackCard key={index} {...feedback} index={index} />
+              <FeedbackCard 
+                key={index} 
+                {...feedback} 
+                index={index} 
+              />
             ))}
           </div>
+          {feedbackData.length === 0 && (
+            <div className="text-center py-8 bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-100/50">
+              <p className="text-gray-600">Nenhum feedback da IA disponível nos dados carregados.</p>
+            </div>
+          )}
         </motion.div>
 
         {/* Participants Table */}
