@@ -1,17 +1,26 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Header } from './components/Header';
 import { KPICard } from './components/KPICard';
 import { ChartCard } from './components/ChartCard';
 import { FeedbackCard } from './components/FeedbackCard';
 import { ParticipantTable } from './components/ParticipantTable';
+import { FileUpload } from './components/FileUpload';
 import { mockMentorshipData } from './data/mockData';
 import { calculateKPIs, generateChartData, analyzeFeedback } from './utils/analytics';
+import { MentorshipData } from './types';
 
 function App() {
-  const kpis = calculateKPIs(mockMentorshipData);
-  const chartData = generateChartData(mockMentorshipData);
-  const feedbackData = analyzeFeedback(mockMentorshipData);
+  const [data, setData] = useState<MentorshipData[]>(mockMentorshipData);
+  const [showUpload, setShowUpload] = useState(false);
+
+  const kpis = calculateKPIs(data);
+  const chartData = generateChartData(data);
+  const feedbackData = analyzeFeedback(data);
+
+  const handleDataUpload = (newData: MentorshipData[]) => {
+    setData(newData);
+  };
 
   const kpiCards = [
     {
@@ -60,7 +69,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <Header />
+      <Header onUploadClick={() => setShowUpload(true)} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* KPI Cards */}
@@ -118,8 +127,17 @@ function App() {
         </motion.div>
 
         {/* Participants Table */}
-        <ParticipantTable data={mockMentorshipData} />
+        <ParticipantTable data={data} />
       </main>
+
+      <AnimatePresence>
+        {showUpload && (
+          <FileUpload
+            onDataUpload={handleDataUpload}
+            onClose={() => setShowUpload(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

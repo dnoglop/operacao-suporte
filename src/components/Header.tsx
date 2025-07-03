@@ -1,8 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Bell, Settings, User } from 'lucide-react';
+import { Zap, Bell, Settings, User, Upload } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onUploadClick: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -23,6 +27,14 @@ export const Header: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-4">
+            <button
+              onClick={onUploadClick}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Upload Dados</span>
+            </button>
+            
             <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors relative">
               <Bell className="h-5 w-5" />
               <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
