@@ -187,8 +187,8 @@ export const analyzeFeedback = (data: MentorshipData[], limit?: number): Feedbac
       participant: d['Nome completo'],
       timestamp: d['Carimbo de data/hora'],
       experience: d['1.5 Como foi a sua experiência no último encontro?'],
-      rating: Number(d['1.4 De 0 a 10 qual a nota que você dá para o encontro?']),
-      engagement: Number(d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']),
+      rating: Number(d['1.4 De 0 a 10 qual a nota que você dá para o encontro?']) || 0,
+      engagement: Number(d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']) || 0,
       email: d['Endereço de e-mail'],
       feedback: d['Feedback AI'],
     }));
@@ -310,7 +310,9 @@ export const generateAIInsights = (data: MentorshipData[]) => {
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Access your API key as an environment variable (see "Set up your API key" above)
-const API_KEY = import.meta.env.GEMINI_API_KEY;
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+console.log("GEMINI_API_KEY being used:", API_KEY); // Temporary log for debugging
+console.log("GEMINI_API_KEY being used:", API_KEY); // Temporary log for debugging
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -321,18 +323,39 @@ export const generateIndividualFeedback = async (participant: any): Promise<stri
   const engagement = Number(participant['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']) || 0;
   const suggestion = participant['1.7 Você tem alguma dúvida, comentário ou sugestão?'] || '';
 
-  const prompt = `Analise o seguinte feedback de um participante de mentoria e forneça uma análise detalhada, identificando pontos de atenção e sugerindo planos de ação. Utilize as seguintes informações:
+  const prompt = `
+**Persona:** Você é um especialista em programas de mentoria, analisando feedbacks para gerar insights para os coordenadores. Sua linguagem é profissional, empática e construtiva.
 
-Número do Encontro: ${meetingNumber}
-Nota do Encontro (0-10): ${rating}
-Experiência no Último Encontro: ${experience}
-Engajamento da Dupla (0-10): ${engagement}
-Dúvidas, Comentários ou Sugestões: ${suggestion}
+**Contexto do Programa:** O participante está em um programa de mentoria para desenvolvimento de carreira. O engajamento e a qualidade dos encontros são cruciais.
 
-Sua análise deve ser concisa, profissional e focar em insights acionáveis. Se houver pontos negativos ou áreas de melhoria, sugira um plano de ação específico.`;
+Feedback do Participante:
+- Nome: ${participant['Nome completo']}
+- Número do Encontro: ${meetingNumber}
+- Nota do Encontro (0-10): ${rating}
+- Nota de Engajamento da Dupla (0-10): ${engagement}
+- Descrição da Experiência: "${experience}"
+- Dúvidas ou Sugestões: "${suggestion}"
+
+**Sua Tarefa:**
+Gere uma análise concisa seguindo ESTRITAMENTE o formato Markdown abaixo.
+
+### Análise de Sentimento
+Identifique o sentimento geral (Positivo, Neutro, Alerta Necessário) e justifique em uma única frase.
+
+### Pontos de Destaque
+- Liste 1-2 pontos positivos do feedback. Se não houver, escreva "Nenhum ponto de destaque identificado".
+
+### Pontos de Atenção
+- Liste 1-2 pontos que requerem atenção. Se não houver, escreva "Nenhum ponto de atenção identificado".
+
+---
+
+### Plano de Ação Sugerido
+- Sugira 1-2 ações concretas para o coordenador. A resposta deve ser clara e acionável. Se o feedback for inteiramente positivo, sugira como reconhecer o sucesso. Se nenhuma ação for necessária, escreva "Nenhuma ação imediata necessária".
+`;
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();

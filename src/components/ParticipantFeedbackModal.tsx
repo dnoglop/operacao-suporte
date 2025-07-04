@@ -74,17 +74,6 @@ export const ParticipantFeedbackModal: React.FC<ParticipantFeedbackModalProps> =
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
         </div>
 
-        <div className="p-6 grid grid-cols-2 gap-4 border-b border-gray-200">
-          <div className="flex items-center space-x-2 bg-yellow-50 rounded-lg p-3">
-            <Star className="h-5 w-5 text-yellow-600" />
-            <p className="text-sm text-gray-700">Nota Média: <span className="font-semibold text-gray-900">{averageRating}/10</span></p>
-          </div>
-          <div className="flex items-center space-x-2 bg-indigo-50 rounded-lg p-3">
-            <Users className="h-5 w-5 text-indigo-600" />
-            <p className="text-sm text-gray-700">Engajamento Médio: <span className="font-semibold text-gray-900">{averageEngagement}/10</span></p>
-          </div>
-        </div>
-
         <div className="overflow-y-auto flex-1 p-6 bg-gray-50/50">
           <div className="space-y-4">
             {allFeedbackItems.length > 0 ? (
@@ -92,9 +81,9 @@ export const ParticipantFeedbackModal: React.FC<ParticipantFeedbackModalProps> =
                 <div key={index} className="bg-white/70 rounded-lg p-4 shadow-sm border border-gray-100">
                   <div className="flex items-center space-x-2 mb-2">
                     <MessageSquare className="h-4 w-4 text-gray-500" />
-                    <p className="text-sm font-medium text-gray-700">Comentário {index + 1} ({new Date(feedback.timestamp).toLocaleDateString()})</p>
+                    <p className="text-sm font-medium text-gray-700">Comentário {index + 1} ({new Date(feedback['Carimbo de data/hora']).toLocaleDateString()})</p>
                   </div>
-                  <p className="text-sm text-gray-800 mb-3">{feedback.experience}</p>
+                  <p className="text-sm text-gray-800 mb-3">{feedback['1.5 Como foi a sua experiência no último encontro?']}</p>
                   <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
                     {feedback['1.4 De 0 a 10 qual a nota que você dá para o encontro?'] > 0 && (<div className="flex items-center space-x-1"><Star className="h-3 w-3" /><span>Nota: {feedback['1.4 De 0 a 10 qual a nota que você dá para o encontro?']}/10</span></div>)}
                     {feedback['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?'] > 0 && (<div className="flex items-center space-x-1"><Users className="h-3 w-3" /><span>Engajamento: {feedback['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']}/10</span></div>)}
@@ -110,7 +99,7 @@ export const ParticipantFeedbackModal: React.FC<ParticipantFeedbackModalProps> =
                   <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm text-purple-900 font-medium">Análise IA Personalizada:</p>
-                      {!generatedFeedbacks[`${feedback.timestamp}-${feedback.experience}`] && !generatingFeedback && (
+                      {!generatedFeedbacks[`${feedback['Carimbo de data/hora']}-${feedback['1.5 Como foi a sua experiência no último encontro?']}`] && !generatingFeedback && (
                         <button
                           onClick={() => handleGenerateFeedback(feedback)}
                           className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700"
@@ -125,12 +114,12 @@ export const ParticipantFeedbackModal: React.FC<ParticipantFeedbackModalProps> =
                         <span className="text-sm">Gerando...</span>
                       </div>
                     )}
-                    {generatedFeedbacks[`${feedback.timestamp}-${feedback.experience}`] && (
+                    {generatedFeedbacks[`${feedback['Carimbo de data/hora']}-${feedback['1.5 Como foi a sua experiência no último encontro?']}`] && (
                       <div className="bg-white/70 rounded-lg p-3">
-                        <p className="text-sm text-purple-800">{generatedFeedbacks[`${feedback.timestamp}-${feedback.experience}`]}</p>
+                        <p className="text-sm text-purple-800">{generatedFeedbacks[`${feedback['Carimbo de data/hora']}-${feedback['1.5 Como foi a sua experiência no último encontro?']}`]}</p>
                       </div>
                     )}
-                    {!generatedFeedbacks[`${feedback.timestamp}-${feedback.experience}`] && !generatingFeedback && (
+                    {!generatedFeedbacks[`${feedback['Carimbo de data/hora']}-${feedback['1.5 Como foi a sua experiência no último encontro?']}`] && !generatingFeedback && (
                       <p className="text-sm text-purple-600 italic">Clique em "Gerar" para uma análise personalizada</p>
                     )}
                   </div>

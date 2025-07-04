@@ -16,7 +16,7 @@ export interface MentorshipData {
   '1.7 Você tem alguma dúvida, comentário ou sugestão?': string;
   'Comentários Joule': string;
   'Feedback AI': string;
-  'Validação': 'TRUE' | 'FALSE' | string;
+  'Validação': 'TRUE' | 'VERDADEIRO' | 'FALSO' | 'FALSE' | string;
 }
 
 // Este tipo será usado nos componentes de Feedback

@@ -72,12 +72,12 @@ export const FeedbackCard: React.FC<FeedbackCardProps> = (props) => {
                 )}
               </div>
               {isGenerating && (<div className="flex items-center space-x-2 text-purple-600"><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="h-4 w-4 border-2 border-purple-200 border-t-purple-600 rounded-full" /><span className="text-sm">Gerando...</span></div>)}
-              {generatedFeedback && (<div className="bg-white/70 rounded-lg p-3"><p className="text-sm text-purple-800">{generatedFeedback}</p></div>)}
+              {generatedFeedback && (<div className="bg-white/70 rounded-lg p-3"><div className="text-sm text-purple-800" dangerouslySetInnerHTML={{ __html: generatedFeedback.replace(/\n/g, '<br />') }} /></div>)}
               {!generatedFeedback && !isGenerating && (<p className="text-sm text-purple-600 italic">Clique em "Gerar" para uma análise personalizada</p>)}
             </div>
             <div className="flex items-center space-x-4 text-xs text-gray-500 pt-1">
-              {rating !== undefined && rating > 0 && (<div className="flex items-center space-x-1"><Star className="h-3 w-3" /><span>Nota: {rating}/10</span></div>)}
-              {engagement !== undefined && engagement > 0 && (<div className="flex items-center space-x-1"><Users className="h-3 w-3" /><span>Engajamento: {engagement}/10</span></div>)}
+              {rating !== undefined && (<div className="flex items-center space-x-1"><Star className="h-3 w-3" /><span>Nota: {rating}/10</span></div>)}
+              {engagement !== undefined && (<div className="flex items-center space-x-1"><Users className="h-3 w-3" /><span>Engajamento: {engagement}/10</span></div>)}
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-2">{new Date(timestamp).toLocaleString('pt-BR')}</p>
