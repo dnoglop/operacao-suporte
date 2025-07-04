@@ -41,7 +41,8 @@ export interface KPIData {
 }
 
 export interface ChartData {
-  name: string;
-  value: number;
-  fill?: string;
+  ratingDistribution: { name: string; value: number; }[];
+  programDistribution: { name: string; value: number; }[];
+  engagementDistribution: { name: string; value: number; }[];
+  durationDistribution: { name: string; value: number; }[];
 }

@@ -1,87 +1,28 @@
 // src/components/ParticipantTable.tsx
 
-import React, { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Search, Filter, Download, Eye, CheckCircle, XCircle } from 'lucide-react';
-
-// Defina o tipo dos seus dados para melhor autocompletar e segurança
-// (ajustado com base no seu JSON)
-interface MentorshipData {
-  'Carimbo de data/hora': string;
-  'Endereço de e-mail': string;
-  'Nome completo': string;
-  'Telefone com DDD': string | number;
-  'Você é?': string;
-  'Qual o programa que está participando?': string;
-  'Quantos encontros já foram realizados?': string;
-  '1.2 Qual encontro foi realizado?': number | string;
-  '1.3 Quantos minutos durou o encontro?': number | string;
-  '1.4 De 0 a 10 qual a nota que você dá para o encontro?': number | string;
-  '1.5 Como foi a sua experiência no último encontro?': string;
-  '1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?': number | string;
-  '1.7 Você tem alguma dúvida, comentário ou sugestão?': string;
-  'Comentários Joule': string;
-  'Feedback AI': string;
-  'Validação': 'TRUE' | 'FALSE' | string;
-}
-
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Download, Eye, CheckCircle, XCircle } from 'lucide-react';
+import { MentorshipData } from '../types';
+import { ParticipantFeedbackModal } from './ParticipantFeedbackModal';
 
 interface ParticipantTableProps {
   data: MentorshipData[];
+  setShowParticipantFeedbackModal: (show: boolean) => void;
+  setSelectedParticipant: (email: string | null) => void;
 }
 
-export const ParticipantTable: React.FC<ParticipantTableProps> = ({ data }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [programFilter, setProgramFilter] = useState('all');
-
-  // Usar useMemo para extrair papéis e programas é uma ótima prática
-  const roles = useMemo(() =>
-    [...new Set(data.map(d => d['Você é?']?.trim()).filter(Boolean))].sort(),
-    [data]
-  );
-
-  const programs = useMemo(() =>
-    [...new Set(data.map(d => d['Qual o programa que está participando?']?.trim()).filter(Boolean))].sort(),
-    [data]
-  );
-
-  const filteredData = useMemo(() => {
-    if (!data) return [];
-
-    return data.filter(participant => {
-      if (!participant) return false;
-
-      const searchLower = searchTerm.toLowerCase();
-
-      // Filtro de Busca
-      const matchesSearch = searchTerm === '' ||
-        (participant['Nome completo'] &&
-         typeof participant['Nome completo'] === 'string' &&
-         participant['Nome completo'].toLowerCase().includes(searchLower)) ||
-        (participant['Endereço de e-mail'] &&
-         typeof participant['Endereço de e-mail'] === 'string' &&
-         participant['Endereço de e-mail'].toLowerCase().includes(searchLower));
-
-      // Filtro de Papel
-      const participantRole = participant['Você é?'] ? participant['Você é?'].trim() : '';
-      const matchesRole = roleFilter === 'all' || participantRole === roleFilter;
-
-      // Filtro de Programa
-      const participantProgram = participant['Qual o programa que está participando?'] ?
-        participant['Qual o programa que está participando?'].trim() : '';
-      const matchesProgram = programFilter === 'all' || participantProgram === programFilter;
-
-      return matchesSearch && matchesRole && matchesProgram;
-    });
-  }, [data, searchTerm, roleFilter, programFilter]);
-
-  // Função para exibir a nota de forma segura
+export const ParticipantTable: React.FC<ParticipantTableProps> = ({ data, setShowParticipantFeedbackModal, setSelectedParticipant }) => {
   const renderNote = (note: number | string | undefined) => {
     if (note === '' || note === undefined || note === null) {
       return 'N/A';
     }
     return `${note}/10`;
+  };
+
+  const handleViewFeedback = (participant: MentorshipData) => {
+    setSelectedParticipant(participant['Endereço de e-mail']);
+    setShowParticipantFeedbackModal(true);
   };
 
   return (
@@ -99,47 +40,6 @@ export const ParticipantTable: React.FC<ParticipantTableProps> = ({ data }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar participante..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">Todos os papéis</option>
-          {roles.map(role => (
-            <option key={role} value={role}>{role}</option>
-          ))}
-        </select>
-
-        <select
-          value={programFilter}
-          onChange={(e) => setProgramFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="all">Todos os programas</option>
-          {programs.map(program => (
-            <option key={program} value={program}>{program}</option>
-          ))}
-        </select>
-
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <Filter className="h-4 w-4" />
-          {/* Este contador usa a lista filtrada, por isso o número está correto */}
-          <span>{filteredData.length} resultados</span>
-        </div>
-      </div>
-
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
@@ -154,11 +54,9 @@ export const ParticipantTable: React.FC<ParticipantTableProps> = ({ data }) => {
             </tr>
           </thead>
           <tbody>
-            {/* AQUI É O PONTO CRÍTICO: CERTIFIQUE-SE DE USAR "filteredData.map" */}
-            {filteredData.length > 0 ? (
-              filteredData.map((participant, index) => (
+            {data.length > 0 ? (
+              data.map((participant, index) => (
                 <motion.tr
-                  // Chave única combinando email e timestamp para evitar problemas com dados duplicados
                   key={`${participant['Endereço de e-mail']}-${participant['Carimbo de data/hora']}-${index}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -195,22 +93,22 @@ export const ParticipantTable: React.FC<ParticipantTableProps> = ({ data }) => {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center space-x-1">
-                      {participant['Validação'] === 'TRUE' ? (
+                      {participant['Validação'] === 'TRUE' || 'VERDADEIRO' ? (
                         <CheckCircle className="h-4 w-4 text-green-600" />
                       ) : (
                         <XCircle className="h-4 w-4 text-red-600" />
                       )}
                       <span className={`text-xs font-medium ${
-                        participant['Validação'] === 'TRUE'
+                        participant['Validação'] === 'TRUE' || 'VERDADEIRO'
                           ? 'text-green-800'
                           : 'text-red-800'
                       }`}>
-                        {participant['Validação'] === 'TRUE' ? 'Validado' : 'Pendente'}
+                        {participant['Validação'] === 'TRUE'||'VERDADEIRO' ? 'Validado' : 'Pendente'}
                       </span>
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                    <button onClick={() => handleViewFeedback(participant)} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
                       <Eye className="h-4 w-4" />
                     </button>
                   </td>
@@ -226,6 +124,7 @@ export const ParticipantTable: React.FC<ParticipantTableProps> = ({ data }) => {
           </tbody>
         </table>
       </div>
+      
     </motion.div>
   );
 };

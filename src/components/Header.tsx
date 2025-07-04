@@ -1,12 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Zap, Bell, Settings, User, Upload } from 'lucide-react';
+import { Zap, Bell, Settings, User, RefreshCw } from 'lucide-react';
 
 interface HeaderProps {
-  onUploadClick: () => void;
+  onRefreshClick: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
+export const Header: React.FC<HeaderProps> = ({ onRefreshClick }) => {
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -28,11 +28,11 @@ export const Header: React.FC<HeaderProps> = ({ onUploadClick }) => {
 
           <div className="flex items-center space-x-4">
             <button
-              onClick={onUploadClick}
+              onClick={onRefreshClick}
               className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Upload Dados</span>
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden sm:inline">Atualizar Dados</span>
             </button>
             
             <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors relative">

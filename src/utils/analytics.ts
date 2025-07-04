@@ -28,7 +28,7 @@ const parseDate = (dateStr: string): Date => {
 
 export const calculateKPIs = (data: MentorshipData[]) => {
   if (!data || data.length === 0) {
-    return { totalParticipants: 0, activeMentors: 0, activeMentees: 0, completedMeetings: 0, averageRating: 0, averageEngagement: 0, averageDuration: 0, validatedParticipants: 0 };
+    return { totalParticipants: 0, activeMentors: 0, activeMentees: 0, completedMeetings: 0, averageRating: 0, averageEngagement: 0, averageDuration: 0 };
   }
   
   const toNumber = (value: any) => (typeof value === 'number' ? value : 0);
@@ -50,11 +50,10 @@ export const calculateKPIs = (data: MentorshipData[]) => {
     totalParticipants: data.length,
     activeMentors: data.filter(d => d['Você é?'] === 'Mentor(a)').length,
     activeMentees: data.filter(d => d['Você é?'] === 'Mentorado(a)').length,
-    completedMeetings: data.filter(d => toNumber(d['1.2 Qual encontro foi realizado?']) > 0).length,
+    completedMeetings: data.filter(d => d['Quantos encontros já foram realizados?'] === 'Já realizei um ou mais encontro').length,
     averageRating: Math.round(averageRating * 10) / 10 || 0,
     averageEngagement: Math.round(averageEngagement * 10) / 10 || 0,
     averageDuration: Math.round(averageDuration) || 0,
-    validatedParticipants: data.filter(d => d['Validação'] === 'TRUE').length
   };
 };
 
@@ -65,7 +64,7 @@ export const calculateKPIGrowth = (data: MentorshipData[]) => {
 
 export const generateChartData = (data: MentorshipData[]) => {
   if (!data || data.length === 0) {
-    return { ratingDistribution: [], programDistribution: [], roleDistribution: [], meetingFrequency: [] };
+    return { ratingDistribution: [], programDistribution: [], engagementDistribution: [], durationDistribution: [] };
   }
 
   const ratingCounts: { [key: string]: number } = {};
@@ -93,32 +92,45 @@ export const generateChartData = (data: MentorshipData[]) => {
     value: programCounts[key]
   }));
 
-  const roleCounts: { [key: string]: number } = {};
+  const engagementCounts: { [key: string]: number } = {};
   data.forEach(d => {
-    const role = d['Você é?'];
-    if (role) {
-      roleCounts[role] = (roleCounts[role] || 0) + 1;
+    const engagement = d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?'];
+    if (engagement !== null && engagement !== undefined) {
+      const engagementStr = String(engagement);
+      engagementCounts[engagementStr] = (engagementCounts[engagementStr] || 0) + 1;
     }
   });
-  const roleDistribution = Object.keys(roleCounts).map(key => ({
-    name: key,
-    value: roleCounts[key]
-  }));
-
-  const meetingFrequencyCounts: { [key: string]: number } = {};
-  data.forEach(d => {
-    const frequency = d['1.2 Qual encontro foi realizado?'];
-    if (frequency !== null && frequency !== undefined) {
-      const frequencyStr = String(frequency);
-      meetingFrequencyCounts[frequencyStr] = (meetingFrequencyCounts[frequencyStr] || 0) + 1;
-    }
-  });
-  const meetingFrequency = Object.keys(meetingFrequencyCounts).map(key => ({
-    name: `Encontro ${key}`,
-    value: meetingFrequencyCounts[key]
+  const engagementDistribution = Object.keys(engagementCounts).map(key => ({
+    name: `Engajamento ${key}`,
+    value: engagementCounts[key]
   })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
 
-  return { ratingDistribution, programDistribution, roleDistribution, meetingFrequency };
+  const durationCounts: { [key: string]: number } = {};
+  data.forEach(d => {
+    const duration = Number(d['1.3 Quantos minutos durou o encontro?']);
+    if (!isNaN(duration) && duration > 0) {
+      let range = '';
+      if (duration <= 30) {
+        range = '0-30 min';
+      } else if (duration <= 60) {
+        range = '31-60 min';
+      } else if (duration <= 90) {
+        range = '61-90 min';
+      } else {
+        range = '>90 min';
+      }
+      durationCounts[range] = (durationCounts[range] || 0) + 1;
+    }
+  });
+  const durationDistribution = Object.keys(durationCounts).map(key => ({
+    name: key,
+    value: durationCounts[key]
+  })).sort((a, b) => {
+    const order = ['0-30 min', '31-60 min', '61-90 min', '>90 min'];
+    return order.indexOf(a.name) - order.indexOf(b.name);
+  });
+
+  return { ratingDistribution, programDistribution, engagementDistribution, durationDistribution };
 };
 
 export const getSentiment = (item: MentorshipData): 'positive' | 'neutral' | 'negative' => {
@@ -188,111 +200,145 @@ export const analyzeFeedback = (data: MentorshipData[], limit?: number): Feedbac
 export const generateAIInsights = (data: MentorshipData[]) => {
   const kpis = calculateKPIs(data);
   const feedbackData = analyzeFeedback(data);
-  
-  const positiveFeedback = feedbackData.filter(f => f.sentiment === 'positive').length;
-  const negativeFeedback = feedbackData.filter(f => f.sentiment === 'negative').length;
-  const neutralFeedback = feedbackData.filter(f => f.sentiment === 'neutral').length;
-  
+
   const averageRating = kpis.averageRating;
   const averageEngagement = kpis.averageEngagement;
-  const completionRate = (kpis.completedMeetings / kpis.totalParticipants) * 100;
-  
+  const averageDuration = kpis.averageDuration;
+  const completedMeetings = kpis.completedMeetings;
+
   const insights = [];
-  
-  // Overall sentiment analysis
-  if (positiveFeedback > negativeFeedback * 2) {
-    insights.push({
-      type: 'positive' as const,
-      title: 'Sentimento Geral Positivo',
-      description: `${Math.round((positiveFeedback / feedbackData.length) * 100)}% dos feedbacks são positivos, indicando alta satisfação com o programa.`,
-      icon: 'trending-up'
-    });
-  } else if (negativeFeedback > positiveFeedback) {
-    insights.push({
-      type: 'negative' as const,
-      title: 'Atenção aos Feedbacks',
-      description: `${Math.round((negativeFeedback / feedbackData.length) * 100)}% dos feedbacks são negativos. Recomenda-se investigar as causas.`,
-      icon: 'alert-triangle'
-    });
+
+  // Overall Program Quality Assessment
+  let overallAssessment = 'neutral';
+  let overallDescription = 'A qualidade geral do programa é neutra. Analise os insights específicos para mais detalhes.';
+
+  if (averageRating >= 8 && averageEngagement >= 8 && averageDuration >= 45) {
+    overallAssessment = 'positive';
+    overallDescription = 'O programa demonstra excelente qualidade geral, com altas notas de encontro e engajamento, e duração adequada dos encontros.';
+  } else if (averageRating < 6 || averageEngagement < 6 || averageDuration < 30) {
+    overallAssessment = 'negative';
+    overallDescription = 'O programa necessita de atenção. Há indicadores de baixa qualidade nos encontros, engajamento ou duração.';
+  } else if (averageRating >= 7 && averageEngagement >= 7) {
+    overallAssessment = 'positive';
+    overallDescription = 'O programa apresenta boa qualidade geral, com notas e engajamento acima da média.';
   }
-  
+
+  insights.push({
+    type: overallAssessment as const,
+    title: 'Avaliação Geral do Programa',
+    description: overallDescription,
+    icon: 'award'
+  });
+
   // Rating analysis
   if (averageRating >= 8) {
     insights.push({
       type: 'positive' as const,
-      title: 'Excelente Avaliação',
-      description: `Nota média de ${averageRating}/10 demonstra alta qualidade dos encontros de mentoria.`,
+      title: 'Excelente Avaliação dos Encontros',
+      description: `A nota média dos encontros é de ${averageRating}/10, indicando alta satisfação dos participantes.`,
       icon: 'star'
     });
   } else if (averageRating < 6) {
     insights.push({
       type: 'negative' as const,
-      title: 'Oportunidade de Melhoria',
-      description: `Nota média de ${averageRating}/10 sugere necessidade de melhorias na qualidade dos encontros.`,
+      title: 'Oportunidade de Melhoria na Qualidade dos Encontros',
+      description: `A nota média dos encontros é de ${averageRating}/10, sugerindo a necessidade de revisar o conteúdo ou a dinâmica.`,
       icon: 'alert-circle'
     });
   }
-  
+
   // Engagement analysis
   if (averageEngagement >= 8) {
     insights.push({
       type: 'positive' as const,
-      title: 'Alto Engajamento',
-      description: `Engajamento médio de ${averageEngagement}/10 indica participação ativa das duplas.`,
+      title: 'Alto Engajamento da Dupla',
+      description: `O engajamento médio da dupla é de ${averageEngagement}/10, demonstrando boa interação e participação.`,
       icon: 'users'
     });
   } else if (averageEngagement < 6) {
     insights.push({
       type: 'warning' as const,
-      title: 'Engajamento Baixo',
-      description: `Engajamento médio de ${averageEngagement}/10 pode indicar necessidade de estratégias para aumentar participação.`,
+      title: 'Baixo Engajamento da Dupla',
+      description: `O engajamento médio da dupla é de ${averageEngagement}/10. Considere estratégias para fomentar a participação ativa.`,
       icon: 'user-x'
     });
   }
-  
-  // Completion rate analysis
-  if (completionRate >= 80) {
+
+  // Duration analysis
+  if (averageDuration < 30) {
+    insights.push({
+      type: 'warning' as const,
+      title: 'Duração dos Encontros Abaixo do Ideal',
+      description: `A duração média dos encontros é de ${averageDuration} minutos, o que pode ser insuficiente para sessões de mentoria eficazes.`,
+      icon: 'clock'
+    });
+  } else if (averageDuration > 90) {
+    insights.push({
+      type: 'warning' as const,
+      title: 'Duração dos Encontros Acima do Ideal',
+      description: `A duração média dos encontros é de ${averageDuration} minutos, o que pode indicar sessões excessivamente longas.`,
+      icon: 'clock'
+    });
+  } else {
     insights.push({
       type: 'positive' as const,
-      title: 'Alta Taxa de Participação',
-      description: `${Math.round(completionRate)}% dos participantes já realizaram encontros, demonstrando boa adesão ao programa.`,
-      icon: 'check-circle'
-    });
-  } else if (completionRate < 50) {
-    insights.push({
-      type: 'warning' as const,
-      title: 'Baixa Taxa de Participação',
-      description: `Apenas ${Math.round(completionRate)}% dos participantes realizaram encontros. Considere estratégias de engajamento.`,
+      title: 'Duração Adequada dos Encontros',
+      description: `A duração média dos encontros é de ${averageDuration} minutos, o que está dentro da faixa ideal para sessões de mentoria.`,
       icon: 'clock'
     });
   }
-  
-  // Duration analysis
-  if (kpis.averageDuration < 30) {
-    insights.push({
-      type: 'warning' as const,
-      title: 'Duração dos Encontros',
-      description: `Duração média de ${kpis.averageDuration} minutos pode ser insuficiente para mentoria efetiva.`,
-      icon: 'clock'
-    });
+
+  // Meeting number analysis (simple example)
+  if (completedMeetings > 0) {
+    const meetingNumbers = data.map(d => Number(d['1.2 Qual encontro foi realizado?'])).filter(n => !isNaN(n) && n > 0);
+    if (meetingNumbers.length > 0) {
+      const maxMeetingNumber = Math.max(...meetingNumbers);
+      if (maxMeetingNumber > 1 && completedMeetings / data.length < 0.5) { // Example heuristic for drop-off
+        insights.push({
+          type: 'warning' as const,
+          title: 'Possível Abandono em Encontros Posteriores',
+          description: `Apesar de haver registros de até o encontro ${maxMeetingNumber}, a proporção de encontros concluídos em relação ao total de participantes sugere um possível abandono em etapas avançadas.`,
+          icon: 'trending-down'
+        });
+      }
+    }
   }
-  
+
   return insights;
 };
 
-export const generateIndividualFeedback = (participant: any): string => {
-  // This would typically call an AI service, but for demo purposes, we'll generate based on data
-  const rating = participant.rating || 0;
-  const engagement = participant.engagement || 0;
-  const experience = participant.experience || '';
-  
-  if (rating >= 9 && engagement >= 9) {
-    return `Excelente performance! ${participant.participant} demonstra alta satisfação (${rating}/10) e engajamento excepcional (${engagement}/10). Continue incentivando essa dinâmica positiva.`;
-  } else if (rating >= 7 && engagement >= 7) {
-    return `Boa evolução observada. ${participant.participant} apresenta satisfação satisfatória (${rating}/10) e bom engajamento (${engagement}/10). Há oportunidades para aprimoramento contínuo.`;
-  } else if (rating < 6 || engagement < 6) {
-    return `Atenção necessária. ${participant.participant} apresenta indicadores baixos (Nota: ${rating}/10, Engajamento: ${engagement}/10). Recomenda-se acompanhamento mais próximo e identificação de barreiras.`;
-  } else {
-    return `Performance neutra. ${participant.participant} está dentro da média esperada. Considere estratégias para aumentar o engajamento e satisfação.`;
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Access your API key as an environment variable (see "Set up your API key" above)
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+const genAI = new GoogleGenerativeAI(API_KEY);
+
+export const generateIndividualFeedback = async (participant: any): Promise<string> => {
+  const meetingNumber = Number(participant['1.2 Qual encontro foi realizado?']) || 0;
+  const rating = Number(participant['1.4 De 0 a 10 qual a nota que você dá para o encontro?']) || 0;
+  const experience = participant['1.5 Como foi a sua experiência no último encontro?'] || '';
+  const engagement = Number(participant['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']) || 0;
+  const suggestion = participant['1.7 Você tem alguma dúvida, comentário ou sugestão?'] || '';
+
+  const prompt = `Analise o seguinte feedback de um participante de mentoria e forneça uma análise detalhada, identificando pontos de atenção e sugerindo planos de ação. Utilize as seguintes informações:
+
+Número do Encontro: ${meetingNumber}
+Nota do Encontro (0-10): ${rating}
+Experiência no Último Encontro: ${experience}
+Engajamento da Dupla (0-10): ${engagement}
+Dúvidas, Comentários ou Sugestões: ${suggestion}
+
+Sua análise deve ser concisa, profissional e focar em insights acionáveis. Se houver pontos negativos ou áreas de melhoria, sugira um plano de ação específico.`;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    return text;
+  } catch (error) {
+    console.error("Erro ao gerar feedback com a API Gemini:", error);
+    return "Não foi possível gerar a análise no momento. Por favor, tente novamente mais tarde.";
   }
 };
