@@ -310,7 +310,7 @@ export const generateAIInsights = (data: MentorshipData[]) => {
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Access your API key as an environment variable (see "Set up your API key" above)
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+const API_KEY = import.meta.env.GEMINI_API_KEY;
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 

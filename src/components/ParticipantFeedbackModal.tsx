@@ -17,14 +17,7 @@ export const ParticipantFeedbackModal: React.FC<ParticipantFeedbackModalProps> =
   const [generatedFeedbacks, setGeneratedFeedbacks] = useState<Record<string, string>>({});
 
   const allFeedbackItems = useMemo(() => {
-    return participantFeedbacks.map(participant => ({
-      timestamp: participant['Carimbo de data/hora'],
-      experience: participant['1.5 Como foi a sua experiência no último encontro?'],
-      rating: Number(participant['1.4 De 0 a 10 qual a nota que você dá para o encontro?']) || 0,
-      engagement: Number(participant['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']) || 0,
-      aiFeedback: participant['Feedback AI'],
-      sentiment: getSentiment(participant),
-    })).filter(f => f.experience && f.experience.trim() !== '');
+    return participantFeedbacks.filter(f => f['1.5 Como foi a sua experiência no último encontro?'] && f['1.5 Como foi a sua experiência no último encontro?'].trim() !== '');
   }, [participantFeedbacks]);
 
   const averageRating = useMemo(() => {
@@ -103,8 +96,8 @@ export const ParticipantFeedbackModal: React.FC<ParticipantFeedbackModalProps> =
                   </div>
                   <p className="text-sm text-gray-800 mb-3">{feedback.experience}</p>
                   <div className="flex items-center space-x-4 text-xs text-gray-500 mb-3">
-                    {feedback.rating > 0 && (<div className="flex items-center space-x-1"><Star className="h-3 w-3" /><span>Nota: {feedback.rating}/10</span></div>)}
-                    {feedback.engagement > 0 && (<div className="flex items-center space-x-1"><Users className="h-3 w-3" /><span>Engajamento: {feedback.engagement}/10</span></div>)}
+                    {feedback['1.4 De 0 a 10 qual a nota que você dá para o encontro?'] > 0 && (<div className="flex items-center space-x-1"><Star className="h-3 w-3" /><span>Nota: {feedback['1.4 De 0 a 10 qual a nota que você dá para o encontro?']}/10</span></div>)}
+                    {feedback['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?'] > 0 && (<div className="flex items-center space-x-1"><Users className="h-3 w-3" /><span>Engajamento: {feedback['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']}/10</span></div>)}
                   </div>
                   
                   {feedback.aiFeedback && feedback.aiFeedback.trim() !== '.' && (
