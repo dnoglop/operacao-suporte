@@ -7,14 +7,13 @@ import Papa from 'papaparse';
 import { Header } from './components/Header';
 import { KPICard } from './components/KPICard';
 import { ChartCard } from './components/ChartCard';
-import { FeedbackCard } from './components/FeedbackCard';
 import { FeedbackModal } from './components/FeedbackModal';
 import { ParticipantTable } from './components/ParticipantTable';
 import { ParticipantFeedbackModal } from './components/ParticipantFeedbackModal';
 
 import { FilterBar } from './components/FilterBar';
 import { AIInsights } from './components/AIInsights';
-import { calculateKPIs, calculateKPIGrowth, generateChartData, analyzeFeedback, generateAIInsights } from './utils/analytics';
+import { calculateKPIs, calculateKPIGrowth, calculateKPIGrowthIndicators, generateChartData, analyzeFeedback, generateAIInsights, parseDate } from './utils/analytics';
 import { MentorshipData, FeedbackItem } from './types';
 
 const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSSSSZJB5Ubh4BopYwYzwaCi7yjCv0QoEjjojP8ztCqtVixQYgFQVWj064lyfyVCoAkKPLXk9ensj2-/pub?gid=1449497486&single=true&output=csv';
@@ -27,6 +26,8 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [programFilter, setProgramFilter] = useState('all');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
 
   const [showAllFeedback, setShowAllFeedback] = useState(false);
   const [showParticipantFeedbackModal, setShowParticipantFeedbackModal] = useState(false);
@@ -41,7 +42,11 @@ function App() {
       skipEmptyLines: true,
       transformHeader: header => header.trim(),
       complete: (results) => {
-        setData(results.data as MentorshipData[]);
+        const parsedData = (results.data as MentorshipData[]).map(item => ({
+          ...item,
+          'Carimbo de data/hora': parseDate(item['Carimbo de data/hora'])
+        }));
+        setData(parsedData);
         setIsLoading(false);
       },
       error: (err) => {
@@ -82,26 +87,40 @@ function App() {
       const participantProgram = item['Qual o programa que está participando?']?.trim() ?? '';
       const matchesProgram = programFilter === 'all' || participantProgram === programFilter;
 
-      return matchesSearch && matchesRole && matchesProgram;
+      const itemDate = item['Carimbo de data/hora'];
+      const matchesDate = (!startDate || itemDate >= startDate) && (!endDate || itemDate <= endDate);
+
+      return matchesSearch && matchesRole && matchesProgram && matchesDate;
     });
-  }, [data, searchTerm, roleFilter, programFilter]);
+  }, [data, searchTerm, roleFilter, programFilter, startDate, endDate]);
 
-  const kpis = calculateKPIs(filteredData);
-  const kpiGrowth = calculateKPIGrowth(filteredData);
-  const chartData = generateChartData(filteredData);
-  const recentFeedbackData: FeedbackItem[] = analyzeFeedback(filteredData, 3);
-  const aiInsights = generateAIInsights(filteredData);
+  const kpis = calculateKPIs(filteredData, startDate || new Date(0), endDate || new Date());
+  const kpiGrowth = calculateKPIGrowthIndicators(data, startDate || new Date(0), endDate || new Date());
+  const chartData = generateChartData(filteredData, startDate || new Date(0), endDate || new Date());
+  const recentFeedbackData: FeedbackItem[] = analyzeFeedback(filteredData, 3, startDate || new Date(0), endDate || new Date());
+  const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
+  const [triggerAIAnalysis, setTriggerAIAnalysis] = useState(false);
 
-  
+  useEffect(() => {
+    if (triggerAIAnalysis && filteredData.length > 0) {
+      const fetchInsights = async () => {
+        const insights = await generateAIInsights(filteredData, startDate || new Date(0), endDate || new Date());
+        setAiInsights(insights);
+        setTriggerAIAnalysis(false); // Reset trigger after analysis
+      };
+      fetchInsights();
+    }
+  }, [triggerAIAnalysis, filteredData, startDate, endDate]);
 
   const renderDashboard = () => {
+    // CORREÇÃO: Passa os novos indicadores de crescimento para os cards de Mentor/Mentorado
     const kpiCards = [
-      { title: 'Total de Participantes', value: kpis.totalParticipants, change: kpiGrowth.totalParticipants, icon: 'users', color: 'bg-blue-500' },
-      { title: 'Encontros Realizados', value: kpis.completedMeetings, change: kpiGrowth.completedMeetings, icon: 'calendar', color: 'bg-green-500' },
-      { title: 'Nota Média', value: `${kpis.averageRating}/10`, change: kpiGrowth.averageRating, icon: 'star', color: 'bg-yellow-500' },
-      { title: 'Duração Média', value: `${kpis.averageDuration}min`, change: kpiGrowth.averageDuration, icon: 'clock', color: 'bg-purple-500' },
-      { title: 'Engajamento Médio', value: `${kpis.averageEngagement}/10`, change: kpiGrowth.averageEngagement, icon: 'award', color: 'bg-indigo-500' },
-      
+      { title: 'Respostas de Mentores', value: kpis.respostasDeMentores, change: kpiGrowth.respostasDeMentoresChange, icon: 'users', color: 'bg-blue-500' },
+      { title: 'Respostas de Mentorados', value: kpis.respostasDeMentorados, change: kpiGrowth.respostasDeMentoradosChange, icon: 'users', color: 'bg-indigo-500' },
+      { title: 'Encontros Realizados', value: kpis.completedMeetings, change: kpiGrowth.completedMeetingsChange, icon: 'calendar', color: 'bg-green-500' },
+      { title: 'Nota Média', value: `${kpis.averageRating}/10`, change: kpiGrowth.averageRatingChange, icon: 'star', color: 'bg-yellow-500' },
+      { title: 'Duração Média', value: `${kpis.averageDuration}min`, change: kpiGrowth.averageDurationChange, icon: 'clock', color: 'bg-purple-500' },
+      { title: 'Engajamento Médio', value: `${kpis.averageEngagement}/10`, change: kpiGrowth.averageEngagementChange, icon: 'award', color: 'bg-pink-500' },
     ];
 
     if (isLoading) return <div className="text-center py-20 text-gray-600 font-semibold">Carregando dashboard...</div>;
@@ -118,7 +137,7 @@ function App() {
           <ChartCard title="Distribuição por Programa" data={chartData.programDistribution} type="pie" colors={['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4']} index={2} />
           <ChartCard title="Distribuição de Duração dos Encontros" data={chartData.durationDistribution} type="bar" colors={['#EF4444']} index={3} />
         </div>
-        <AIInsights insights={aiInsights} />
+        <AIInsights insights={aiInsights} data={filteredData} setTriggerAIAnalysis={setTriggerAIAnalysis} />
 
         <div className="mt-8">
           <ParticipantTable
@@ -144,6 +163,10 @@ function App() {
           setProgramFilter={setProgramFilter}
           roles={roles}
           programs={programs}
+          startDate={startDate}
+          setStartDate={setStartDate}
+          endDate={endDate}
+          setEndDate={setEndDate}
         />
         {renderDashboard()}
       </main>

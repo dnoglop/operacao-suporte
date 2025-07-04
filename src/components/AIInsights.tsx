@@ -21,6 +21,7 @@ interface AIInsight {
 
 interface AIInsightsProps {
   insights: AIInsight[];
+  setTriggerAIAnalysis: (trigger: boolean) => void;
 }
 
 const iconMap = {
@@ -34,7 +35,7 @@ const iconMap = {
   'clock': Clock,
 };
 
-export const AIInsights: React.FC<AIInsightsProps> = ({ insights }) => {
+export const AIInsights: React.FC<AIInsightsProps> = ({ insights, setTriggerAIAnalysis }) => {
   const getInsightStyle = (type: string) => {
     switch (type) {
       case 'positive':
@@ -87,44 +88,50 @@ export const AIInsights: React.FC<AIInsightsProps> = ({ insights }) => {
           <h2 className="text-xl font-bold text-gray-900">Insights da IA</h2>
           <p className="text-sm text-gray-600">Análise automática dos dados de mentoria</p>
         </div>
+        <button
+          onClick={() => setTriggerAIAnalysis(true)}
+          className="ml-auto px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors duration-200"
+        >
+          Gerar Análise da IA
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {insights.map((insight, index) => {
-          const style = getInsightStyle(insight.type);
-          const IconComponent = iconMap[insight.icon as keyof typeof iconMap] || Brain;
+      {insights.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {insights.map((insight, index) => {
+            const style = getInsightStyle(insight.type);
+            const IconComponent = iconMap[insight.icon as keyof typeof iconMap] || Brain;
 
-          return (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`${style.bg} ${style.border} border rounded-xl p-4`}
-            >
-              <div className="flex items-start space-x-3">
-                <div className={`p-2 rounded-lg bg-white/50`}>
-                  <IconComponent className={`h-5 w-5 ${style.icon}`} />
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className={`${style.bg} ${style.border} border rounded-xl p-4`}
+              >
+                <div className="flex items-start space-x-3">
+                  <div className={`p-2 rounded-lg bg-white/50`}>
+                    <IconComponent className={`h-5 w-5 ${style.icon}`} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className={`font-semibold ${style.title} mb-1`}>
+                      {insight.title}
+                    </h3>
+                    <p className={`text-sm ${style.description}`}>
+                      {insight.description}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <h3 className={`font-semibold ${style.title} mb-1`}>
-                    {insight.title}
-                  </h3>
-                  <p className={`text-sm ${style.description}`}>
-                    {insight.description}
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {insights.length === 0 && (
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
         <div className="text-center py-8">
           <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600">
-            Carregue dados para gerar insights automáticos
+            Clique em 'Gerar Análise da IA' para obter insights.
           </p>
         </div>
       )}

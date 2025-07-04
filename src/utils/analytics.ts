@@ -2,40 +2,177 @@
 
 import { MentorshipData, FeedbackItem } from '../types';
 
-// Função de parse de data robusta
-const parseDate = (dateStr: string): Date => {
-  if (!dateStr || typeof dateStr !== 'string') return new Date(0);
-
-  // Formato: DD/MM/YYYY HH:MM:SS
-  let parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s(.*)/);
-  if (parts) {
-    return new Date(`${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}T${parts[4]}`);
+// Função de parse de data corrigida para formato DD/MM/YYYY
+export const parseDate = (dateStr: string): Date => {
+  if (!dateStr || typeof dateStr !== 'string') {
+    console.warn('Data inválida ou vazia:', dateStr);
+    return new Date(0);
   }
 
-  // Formato: M/D/YY HH:MM:SS
-  parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2})\s(.*)/);
+  // Remove espaços extras
+  const cleanDateStr = dateStr.trim();
+  
+  // Formato principal esperado: DD/MM/YYYY HH:MM:SS
+  let parts = cleanDateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.*)$/);
   if (parts) {
-    const year = parseInt(parts[3], 10) + 2000;
-    return new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T${parts[4]}`);
+    const day = parts[1].padStart(2, '0');
+    const month = parts[2].padStart(2, '0');
+    const year = parts[3];
+    const time = parts[4];
+    
+    // Constrói a data no formato ISO: YYYY-MM-DDTHH:MM:SS
+    const isoDate = `${year}-${month}-${day}T${time}`;
+    const date = new Date(isoDate);
+    
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
   }
-  
-  // Tenta um formato mais genérico, pode funcionar para alguns casos
-  const d = new Date(dateStr);
-  if (!isNaN(d.getTime())) return d;
-  
-  return new Date(0); // Fallback se tudo falhar
+
+  // Formato alternativo: DD/MM/YYYY (sem horário)
+  parts = cleanDateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (parts) {
+    const day = parts[1].padStart(2, '0');
+    const month = parts[2].padStart(2, '0');
+    const year = parts[3];
+    
+    const isoDate = `${year}-${month}-${day}T00:00:00`;
+    const date = new Date(isoDate);
+    
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  // Formato MM/DD/YYYY (formato americano, caso apareça)
+  parts = cleanDateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.*)$/);
+  if (parts) {
+    // Tenta primeiro como DD/MM/YYYY, depois como MM/DD/YYYY
+    const firstNum = parseInt(parts[1]);
+    const secondNum = parseInt(parts[2]);
+    
+    // Se o primeiro número é > 12, provavelmente é dia
+    if (firstNum > 12) {
+      const day = parts[1].padStart(2, '0');
+      const month = parts[2].padStart(2, '0');
+      const year = parts[3];
+      const time = parts[4];
+      
+      const isoDate = `${year}-${month}-${day}T${time}`;
+      const date = new Date(isoDate);
+      
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+  }
+
+  // Formato de ano com 2 dígitos: DD/MM/YY
+  parts = cleanDateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})\s+(.*)$/);
+  if (parts) {
+    const day = parts[1].padStart(2, '0');
+    const month = parts[2].padStart(2, '0');
+    const year = parseInt(parts[3], 10);
+    const fullYear = year < 50 ? 2000 + year : 1900 + year; // Assume 2000+ para anos < 50
+    const time = parts[4];
+    
+    const isoDate = `${fullYear}-${month}-${day}T${time}`;
+    const date = new Date(isoDate);
+    
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+
+  // Último recurso: tenta o construtor Date nativo
+  const fallbackDate = new Date(cleanDateStr);
+  if (!isNaN(fallbackDate.getTime())) {
+    return fallbackDate;
+  }
+
+  console.error('Não foi possível fazer parse da data:', dateStr);
+  return new Date(0); // Retorna época Unix como fallback
 };
 
-export const calculateKPIs = (data: MentorshipData[]) => {
-  if (!data || data.length === 0) {
-    return { totalParticipants: 0, activeMentors: 0, activeMentees: 0, completedMeetings: 0, averageRating: 0, averageEngagement: 0, averageDuration: 0 };
+// Função auxiliar para debug de datas
+export const debugDate = (dateStr: string) => {
+  console.log('Data original:', dateStr);
+  const parsed = parseDate(dateStr);
+  console.log('Data parseada:', parsed);
+  console.log('É válida?', !isNaN(parsed.getTime()));
+  console.log('Timestamp:', parsed.getTime());
+  return parsed;
+};
+
+// Função para normalizar datas para comparação (apenas data, sem horário)
+export const normalizeDate = (date: Date): Date => {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+};
+
+// Função melhorada para filtrar dados por data
+export const filterDataByDateRange = (data: MentorshipData[], startDate?: Date, endDate?: Date) => {
+  if (!startDate || !endDate) {
+    return data;
+  }
+
+  const normalizedStart = normalizeDate(startDate);
+  const normalizedEnd = normalizeDate(endDate);
+  
+  return data.filter(d => {
+    // CORREÇÃO: Verifica se o campo é um objeto Date antes de tentar fazer o parse
+    const dateValue = d['Carimbo de data/hora'];
+    if (!dateValue) return false;
+
+    let itemDate;
+    if (dateValue instanceof Date) {
+        itemDate = dateValue; // Já é um objeto Date, usa diretamente
+    } else if (typeof dateValue === 'string') {
+        itemDate = parseDate(dateValue); // É uma string, faz o parse
+    } else {
+        return false; // Formato desconhecido
+    }
+    
+    if (isNaN(itemDate.getTime())) return false;
+    
+    const normalizedItemDate = normalizeDate(itemDate);
+    
+    return normalizedItemDate >= normalizedStart && normalizedItemDate <= normalizedEnd;
+  });
+};
+
+// Função calculateKPIs atualizada
+export const calculateKPIs = (data: MentorshipData[], startDate?: Date, endDate?: Date) => {
+  // O parâmetro 'data' já vem filtrado do componente App.tsx.
+  const filteredData = data;
+  
+  if (!filteredData || filteredData.length === 0) {
+    return { 
+      totalParticipants: 0, 
+      activeMentors: 0, 
+      activeMentees: 0, 
+      completedMeetings: 0, 
+      averageRating: 0, 
+      averageEngagement: 0, 
+      averageDuration: 0,
+      respostasDeMentores: 0,
+      respostasDeMentorados: 0
+    };
   }
   
-  const toNumber = (value: any) => (typeof value === 'number' ? value : 0);
+  const toNumber = (value: any) => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const num = parseFloat(value);
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
+  };
 
-  const validRatings = data.filter(d => toNumber(d['1.4 De 0 a 10 qual a nota que você dá para o encontro?']) > 0);
-  const validEngagements = data.filter(d => toNumber(d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']) > 0);
-  const validDurations = data.filter(d => toNumber(d['1.3 Quantos minutos durou o encontro?']) > 0);
+  const validRatings = filteredData.filter(d => toNumber(d['1.4 De 0 a 10 qual a nota que você dá para o encontro?']) > 0);
+  const validEngagements = filteredData.filter(d => toNumber(d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?']) > 0);
+  const validDurations = filteredData.filter(d => toNumber(d['1.3 Quantos minutos durou o encontro?']) > 0);
 
   const totalRating = validRatings.reduce((sum, d) => sum + toNumber(d['1.4 De 0 a 10 qual a nota que você dá para o encontro?']), 0);
   const averageRating = validRatings.length > 0 ? totalRating / validRatings.length : 0;
@@ -46,67 +183,78 @@ export const calculateKPIs = (data: MentorshipData[]) => {
   const totalDuration = validDurations.reduce((sum, d) => sum + toNumber(d['1.3 Quantos minutos durou o encontro?']), 0);
   const averageDuration = validDurations.length > 0 ? totalDuration / validDurations.length : 0;
 
+  const uniqueMentors = new Set(filteredData.filter(d => d['Você é?'] === 'Mentor(a)').map(d => d['Endereço de e-mail']));
+  const uniqueMentees = new Set(filteredData.filter(d => d['Você é?'] === 'Mentorado(a)').map(d => d['Endereço de e-mail']));
+
   return {
-    totalParticipants: data.length,
-    activeMentors: data.filter(d => d['Você é?'] === 'Mentor(a)').length,
-    activeMentees: data.filter(d => d['Você é?'] === 'Mentorado(a)').length,
-    completedMeetings: data.filter(d => d['Quantos encontros já foram realizados?'] === 'Já realizei um ou mais encontro').length,
+    activeMentors: filteredData.filter(d => d['Você é?'] === 'Mentor(a)').length,
+    activeMentees: filteredData.filter(d => d['Você é?'] === 'Mentorado(a)').length,
+    respostasDeMentores: uniqueMentors.size,
+    respostasDeMentorados: uniqueMentees.size,
+    completedMeetings: filteredData.filter(d => d['Quantos encontros já foram realizados?'] === 'Já realizei um ou mais encontro').length,
     averageRating: Math.round(averageRating * 10) / 10 || 0,
     averageEngagement: Math.round(averageEngagement * 10) / 10 || 0,
     averageDuration: Math.round(averageDuration) || 0,
   };
 };
 
-export const calculateKPIGrowth = (data: MentorshipData[]) => {
-    // Implementação mantida, mas garantindo que `parseDate` seja usada
-    return { totalParticipants: 0, completedMeetings: 0, averageRating: 0, averageDuration: 0, averageEngagement: 0, validatedParticipants: 0 };
-};
+// Função generateChartData atualizada
+export const generateChartData = (data: MentorshipData[], startDate?: Date, endDate?: Date) => {
+  const filteredData = data;
 
-export const generateChartData = (data: MentorshipData[]) => {
-  if (!data || data.length === 0) {
-    return { ratingDistribution: [], programDistribution: [], engagementDistribution: [], durationDistribution: [] };
+  if (!filteredData || filteredData.length === 0) {
+    return { 
+      ratingDistribution: [], 
+      programDistribution: [], 
+      engagementDistribution: [], 
+      durationDistribution: [] 
+    };
   }
 
+  // Resto da função permanece igual...
   const ratingCounts: { [key: string]: number } = {};
-  data.forEach(d => {
+  filteredData.forEach(d => {
     const rating = d['1.4 De 0 a 10 qual a nota que você dá para o encontro?'];
     if (rating !== null && rating !== undefined) {
       const ratingStr = String(rating);
       ratingCounts[ratingStr] = (ratingCounts[ratingStr] || 0) + 1;
     }
   });
+  
   const ratingDistribution = Object.keys(ratingCounts).map(key => ({
     name: `Nota ${key}`,
     value: ratingCounts[key]
   })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
 
   const programCounts: { [key: string]: number } = {};
-  data.forEach(d => {
+  filteredData.forEach(d => {
     const program = d['Qual o programa que está participando?'];
     if (program) {
       programCounts[program] = (programCounts[program] || 0) + 1;
     }
   });
+  
   const programDistribution = Object.keys(programCounts).map(key => ({
     name: key,
     value: programCounts[key]
   }));
 
   const engagementCounts: { [key: string]: number } = {};
-  data.forEach(d => {
+  filteredData.forEach(d => {
     const engagement = d['1.6 De 0 a 10 qual a nota que você dá para o engajamento da sua dupla?'];
     if (engagement !== null && engagement !== undefined) {
       const engagementStr = String(engagement);
       engagementCounts[engagementStr] = (engagementCounts[engagementStr] || 0) + 1;
     }
   });
+  
   const engagementDistribution = Object.keys(engagementCounts).map(key => ({
     name: `Engajamento ${key}`,
     value: engagementCounts[key]
   })).sort((a, b) => parseInt(a.name.split(' ')[1]) - parseInt(b.name.split(' ')[1]));
 
   const durationCounts: { [key: string]: number } = {};
-  data.forEach(d => {
+  filteredData.forEach(d => {
     const duration = Number(d['1.3 Quantos minutos durou o encontro?']);
     if (!isNaN(duration) && duration > 0) {
       let range = '';
@@ -122,6 +270,7 @@ export const generateChartData = (data: MentorshipData[]) => {
       durationCounts[range] = (durationCounts[range] || 0) + 1;
     }
   });
+  
   const durationDistribution = Object.keys(durationCounts).map(key => ({
     name: key,
     value: durationCounts[key]
@@ -153,37 +302,21 @@ export const getSentiment = (item: MentorshipData): 'positive' | 'neutral' | 'ne
 
 
 // ----- FUNÇÃO CORRIGIDA -----
-export const analyzeFeedback = (data: MentorshipData[], limit?: number): FeedbackItem[] => {
+export const analyzeFeedback = (data: MentorshipData[], limit?: number, startDate?: Date, endDate?: Date): FeedbackItem[] => {
   if (!data) return [];
   
-  // parseDate continua sendo a função robusta que definimos antes
-  const parseDate = (dateStr: string): Date => {
-      if (!dateStr || typeof dateStr !== 'string') return new Date(0);
-      let parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s(.*)/);
-      if (parts) return new Date(`${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}T${parts[4]}`);
-      parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2})\s(.*)/);
-      if (parts) {
-          const year = parseInt(parts[3], 10) + 2000;
-          return new Date(`${year}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T${parts[4]}`);
-      }
-      const d = new Date(dateStr);
-      return !isNaN(d.getTime()) ? d : new Date(0);
-  };
+  const filteredData = data;
   
-  const feedbackData = data
-    // CORREÇÃO: Vamos filtrar por qualquer participante que tenha realizado ao menos um encontro.
+  const feedbackData = filteredData
     .filter(d => d['Quantos encontros já foram realizados?'] === 'Já realizei um ou mais encontro')
-    // Ordena do mais recente para o mais antigo
     .sort((a, b) => {
-        const dateA = parseDate(a['Carimbo de data/hora']);
-        const dateB = parseDate(b['Carimbo de data/hora']);
+        const dateA = a['Carimbo de data/hora'];
+        const dateB = b['Carimbo de data/hora'];
         return dateB.getTime() - dateA.getTime();
     })
-    // Mapeia para o formato que o FeedbackCard espera
     .map((d): FeedbackItem => ({
       ...d,
       sentiment: getSentiment(d),
-      // Mapeia as chaves para nomes mais simples para o FeedbackCard usar
       participant: d['Nome completo'],
       timestamp: d['Carimbo de data/hora'],
       experience: d['1.5 Como foi a sua experiência no último encontro?'],
@@ -193,126 +326,94 @@ export const analyzeFeedback = (data: MentorshipData[], limit?: number): Feedbac
       feedback: d['Feedback AI'],
     }));
 
-  // Se um limite foi passado (ex: 10), retorna apenas essa quantidade
   return limit ? feedbackData.slice(0, limit) : feedbackData;
 };
 
-export const generateAIInsights = (data: MentorshipData[]) => {
-  const kpis = calculateKPIs(data);
-  const feedbackData = analyzeFeedback(data);
+export const generateAIInsights = async (data: MentorshipData[], startDate?: Date, endDate?: Date) => {
+  const kpis = calculateKPIs(data, startDate, endDate);
+  // CORREÇÃO: A linha abaixo foi re-adicionada para definir a variável feedbackData.
+  const feedbackData = analyzeFeedback(data, undefined, startDate, endDate);
+  const growthIndicators = calculateKPIGrowthIndicators(data, startDate || new Date(0), endDate || new Date());
 
-  const averageRating = kpis.averageRating;
-  const averageEngagement = kpis.averageEngagement;
-  const averageDuration = kpis.averageDuration;
-  const completedMeetings = kpis.completedMeetings;
+  const prompt = `
+  Você é um especialista em análise de dados de programas de mentoria. Sua tarefa é gerar insights acionáveis para os coordenadores do programa com base nos dados fornecidos.
 
-  const insights = [];
+  Dados do Programa (KPIs):
+  - Respostas de Mentores: ${kpis.respostasDeMentores} (Crescimento: ${growthIndicators.respostasDeMentoresChange.toFixed(1)}%)
+  - Respostas de Mentorados: ${kpis.respostasDeMentorados} (Crescimento: ${growthIndicators.respostasDeMentoradosChange.toFixed(1)}%)
+  - Encontros Realizados: ${kpis.completedMeetings} (Crescimento: ${growthIndicators.completedMeetingsChange.toFixed(1)}%)
+  - Nota Média dos Encontros: ${kpis.averageRating}/10 (Crescimento: ${growthIndicators.averageRatingChange.toFixed(1)}%)
+  - Duração Média dos Encontros: ${kpis.averageDuration} minutos (Crescimento: ${growthIndicators.averageDurationChange.toFixed(1)}%)
+  - Engajamento Médio da Dupla: ${kpis.averageEngagement}/10 (Crescimento: ${growthIndicators.averageEngagementChange.toFixed(1)}%)
 
-  // Overall Program Quality Assessment
-  let overallAssessment = 'neutral';
-  let overallDescription = 'A qualidade geral do programa é neutra. Analise os insights específicos para mais detalhes.';
+  Feedbacks Recentes (últimos 3, se disponíveis):
+  ${feedbackData.slice(0, 3).map(f => `- Participante: ${f.participant}, Nota: ${f.rating}, Engajamento: ${f.engagement}, Experiência: ${f.experience}`).join('\n') || 'Nenhum feedback recente disponível.'}
 
-  if (averageRating >= 8 && averageEngagement >= 8 && averageDuration >= 45) {
-    overallAssessment = 'positive';
-    overallDescription = 'O programa demonstra excelente qualidade geral, com altas notas de encontro e engajamento, e duração adequada dos encontros.';
-  } else if (averageRating < 6 || averageEngagement < 6 || averageDuration < 30) {
-    overallAssessment = 'negative';
-    overallDescription = 'O programa necessita de atenção. Há indicadores de baixa qualidade nos encontros, engajamento ou duração.';
-  } else if (averageRating >= 7 && averageEngagement >= 7) {
-    overallAssessment = 'positive';
-    overallDescription = 'O programa apresenta boa qualidade geral, com notas e engajamento acima da média.';
-  }
+  Com base nesses dados, gere uma lista de insights no formato JSON. Cada insight deve ter as seguintes propriedades:
+  - type: 'positive' | 'negative' | 'warning' | 'neutral'
+  - title: Título conciso do insight
+  - description: Descrição detalhada do insight
+  - icon: Nome do ícone (escolha entre 'award', 'star', 'alert-circle', 'users', 'user-x', 'clock', 'trending-up', 'alert-triangle', 'check-circle')
 
-  insights.push({
-    type: overallAssessment as const,
-    title: 'Avaliação Geral do Programa',
-    description: overallDescription,
-    icon: 'award'
-  });
-
-  // Rating analysis
-  if (averageRating >= 8) {
-    insights.push({
-      type: 'positive' as const,
-      title: 'Excelente Avaliação dos Encontros',
-      description: `A nota média dos encontros é de ${averageRating}/10, indicando alta satisfação dos participantes.`,
-      icon: 'star'
-    });
-  } else if (averageRating < 6) {
-    insights.push({
-      type: 'negative' as const,
-      title: 'Oportunidade de Melhoria na Qualidade dos Encontros',
-      description: `A nota média dos encontros é de ${averageRating}/10, sugerindo a necessidade de revisar o conteúdo ou a dinâmica.`,
-      icon: 'alert-circle'
-    });
-  }
-
-  // Engagement analysis
-  if (averageEngagement >= 8) {
-    insights.push({
-      type: 'positive' as const,
-      title: 'Alto Engajamento da Dupla',
-      description: `O engajamento médio da dupla é de ${averageEngagement}/10, demonstrando boa interação e participação.`,
-      icon: 'users'
-    });
-  } else if (averageEngagement < 6) {
-    insights.push({
-      type: 'warning' as const,
-      title: 'Baixo Engajamento da Dupla',
-      description: `O engajamento médio da dupla é de ${averageEngagement}/10. Considere estratégias para fomentar a participação ativa.`,
-      icon: 'user-x'
-    });
-  }
-
-  // Duration analysis
-  if (averageDuration < 30) {
-    insights.push({
-      type: 'warning' as const,
-      title: 'Duração dos Encontros Abaixo do Ideal',
-      description: `A duração média dos encontros é de ${averageDuration} minutos, o que pode ser insuficiente para sessões de mentoria eficazes.`,
-      icon: 'clock'
-    });
-  } else if (averageDuration > 90) {
-    insights.push({
-      type: 'warning' as const,
-      title: 'Duração dos Encontros Acima do Ideal',
-      description: `A duração média dos encontros é de ${averageDuration} minutos, o que pode indicar sessões excessivamente longas.`,
-      icon: 'clock'
-    });
-  } else {
-    insights.push({
-      type: 'positive' as const,
-      title: 'Duração Adequada dos Encontros',
-      description: `A duração média dos encontros é de ${averageDuration} minutos, o que está dentro da faixa ideal para sessões de mentoria.`,
-      icon: 'clock'
-    });
-  }
-
-  // Meeting number analysis (simple example)
-  if (completedMeetings > 0) {
-    const meetingNumbers = data.map(d => Number(d['1.2 Qual encontro foi realizado?'])).filter(n => !isNaN(n) && n > 0);
-    if (meetingNumbers.length > 0) {
-      const maxMeetingNumber = Math.max(...meetingNumbers);
-      if (maxMeetingNumber > 1 && completedMeetings / data.length < 0.5) { // Example heuristic for drop-off
-        insights.push({
-          type: 'warning' as const,
-          title: 'Possível Abandono em Encontros Posteriores',
-          description: `Apesar de haver registros de até o encontro ${maxMeetingNumber}, a proporção de encontros concluídos em relação ao total de participantes sugere um possível abandono em etapas avançadas.`,
-          icon: 'trending-down'
-        });
-      }
+  Exemplo de formato JSON:
+  [
+    {
+      "type": "positive",
+      "title": "Alta Satisfação Geral",
+      "description": "A nota média dos encontros e o engajamento da dupla estão consistentemente altos, indicando um programa de mentoria bem-sucedido.",
+      "icon": "award"
     }
-  }
+  ]
 
-  return insights;
+  Gere no mínimo 3 e no máximo 5 insights. Priorize insights que sejam acionáveis e relevantes para a melhoria ou reconhecimento do programa.
+  `;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    const jsonString = text.replace(/^\s*```json\s*\n|\n\s*```\s*$/g, '');
+
+    try {
+      const insights = JSON.parse(jsonString);
+      if (Array.isArray(insights) && insights.every(i => i.type && i.title && i.description && i.icon)) {
+        return insights;
+      } else {
+        console.error("Formato de insights inválido retornado pela API Gemini:", text);
+        return [{
+          type: 'negative',
+          title: 'Erro na Geração de Insights',
+          description: 'A API retornou um formato de insights inesperado. Por favor, verifique a configuração ou tente novamente.',
+          icon: 'alert-circle'
+        }];
+      }
+    } catch (jsonError) {
+      console.error("Erro ao parsear JSON da API Gemini:", jsonError, "Texto recebido:", text);
+      return [{
+        type: 'negative',
+        title: 'Erro de Formato da API',
+        description: 'Não foi possível processar a resposta da API. O formato JSON está incorreto.',
+        icon: 'alert-circle'
+      }];
+    }
+
+  } catch (error) {
+    console.error("Erro ao gerar insights com a API Gemini:", error);
+    return [{
+      type: 'negative',
+      title: 'Erro de Conexão com a API',
+      description: 'Não foi possível gerar os insights no momento. Verifique sua conexão ou a chave da API.',
+      icon: 'alert-circle'
+    }];
+  }
 };
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Access your API key as an environment variable (see "Set up your API key" above)
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-console.log("GEMINI_API_KEY being used:", API_KEY); // Temporary log for debugging
-console.log("GEMINI_API_KEY being used:", API_KEY); // Temporary log for debugging
+console.log("GEMINI_API_KEY being used:", API_KEY);
+console.log("GEMINI_API_KEY being used:", API_KEY);
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -365,3 +466,81 @@ Identifique o sentimento geral (Positivo, Neutro, Alerta Necessário) e justifiq
     return "Não foi possível gerar a análise no momento. Por favor, tente novamente mais tarde.";
   }
 };
+
+
+/**
+ * Calcula a variação percentual entre dois números e arredonda para uma casa decimal.
+ * @param current O valor atual.
+ * @param previous O valor anterior.
+ * @returns A variação percentual arredondada.
+ */
+const calculatePercentageChange = (current: number, previous: number): number => {
+  if (previous === 0) {
+    return current > 0 ? 100 : 0;
+  }
+  const change = ((current - previous) / previous) * 100;
+  return parseFloat(change.toFixed(1));
+};
+
+/**
+ * Calcula os indicadores de crescimento dos KPIs comparando o período atual com o anterior.
+ * @param allData O conjunto de dados completo, sem filtros de data.
+ * @param currentStartDate A data de início do período atual.
+ * @param currentEndDate A data de fim do período atual.
+ * @returns Um objeto com a variação percentual para cada KPI.
+ */
+export const calculateKPIGrowthIndicators = (
+  allData: MentorshipData[],
+  currentStartDate: Date,
+  currentEndDate: Date
+) => {
+  const duration = currentEndDate.getTime() - currentStartDate.getTime();
+  if (duration <= 0) {
+    return {
+      respostasDeMentoresChange: 0,
+      respostasDeMentoradosChange: 0,
+      completedMeetingsChange: 0,
+      averageRatingChange: 0,
+      averageDurationChange: 0,
+      averageEngagementChange: 0,
+    };
+  }
+
+  const previousEndDate = new Date(currentStartDate.getTime() - 1);
+  const previousStartDate = new Date(previousEndDate.getTime() - duration);
+
+  const currentPeriodData = filterDataByDateRange(allData, currentStartDate, currentEndDate);
+  const previousPeriodData = filterDataByDateRange(allData, previousStartDate, previousEndDate);
+  
+  const currentKPIs = calculateKPIs(currentPeriodData);
+  const previousKPIs = calculateKPIs(previousPeriodData);
+
+  return {
+    respostasDeMentoresChange: calculatePercentageChange(
+      currentKPIs.respostasDeMentores,
+      previousKPIs.respostasDeMentores
+    ),
+    respostasDeMentoradosChange: calculatePercentageChange(
+      currentKPIs.respostasDeMentorados,
+      previousKPIs.respostasDeMentorados
+    ),
+    completedMeetingsChange: calculatePercentageChange(
+      currentKPIs.completedMeetings,
+      previousKPIs.completedMeetings
+    ),
+    averageRatingChange: calculatePercentageChange(
+      currentKPIs.averageRating,
+      previousKPIs.averageRating
+    ),
+    averageDurationChange: calculatePercentageChange(
+      currentKPIs.averageDuration,
+      previousKPIs.averageDuration
+    ),
+    averageEngagementChange: calculatePercentageChange(
+      currentKPIs.averageEngagement,
+      previousKPIs.averageEngagement
+    ),
+  };
+};
+
+export const calculateKPIGrowth = calculateKPIGrowthIndicators;
